@@ -26,25 +26,6 @@ function mmod(m, n) {
   return ((m % n) + n) % n;
 }
 
-//Game
-function AsteroidsGame() {
-  this.view = new AsteroidsView();
-  this.newGame();
-
-  this.newGame = function() {
-    this.ship = new Ship(WIDTH/2, HEIGHT/2);
-    this.shots = new Shots();
-    this.playing = false;
-  }
-
-  this.thrust = function(modifier) {
-    if (!this.playing){
-      this.playing = true;
-    }
-    this.ship.thrust(modifier);
-  }
-}
-
 //Game Objects
 function Ship(x, y) {
   this.x = x;
@@ -100,8 +81,7 @@ function Ship(x, y) {
   }
 }
 
-function Shots(x,y,dx,dy,v) {
-
+function Shot(x,y,dx,dy,v) {
   this.x = x;
   this.y = y;
   this.dx = dx + Math.cos(v) * SHOT_SPEED;
@@ -134,23 +114,23 @@ addEventListener("keyup", function(e) {
 function keyboard(modifier) {
   //Respond to controls
   if (38 in keysDown) { // Player holding up
-    game.thrust(modifier);
+    ship.thrust(modifier);
   }
   if (40 in keysDown) { // Player holding down
 
   }
   if (37 in keysDown) { // Player holding left
-    game.turn(modifier, 'left');
+    ship.turn(modifier, 'left');
   }
   if (39 in keysDown) { // Player holding right
-    game.turn(modifier, 'right');
+    ship.turn(modifier, 'right');
   }
   if (32 in keysDown) { //Player holding space
-    game.fire(modifier);
+    ship.fire(modifier);
   }
 
   //Update the ship
-  game.update(modifier);
+  ship.update(modifier);
 
   //Output to debug
   // document.getElementById("debug").innerHTML =
@@ -212,13 +192,13 @@ function AsteroidsView() {
 }
 
 
-//Main Animation Loop
+//Main Game Loop
 function main() {
   var now = Date.now();
   var delta = now - then;
 
   keyboard(delta / 1000);
-  game.view.render();
+  view.render();
 
   then = now;
 
@@ -231,5 +211,6 @@ requestAnimationFrame = w.requestAnimationFrame || w.webkitRequestAnimationFrame
 
 // Let's play this game!
 var then = Date.now();
-var game = new AsteroidsGame();
+var ship = new Ship(WIDTH/2,HEIGHT/2);
+var view = new AsteroidsView();
 main();
