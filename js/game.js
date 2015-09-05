@@ -9,6 +9,8 @@ var SHOT_LIFE = 1; //in seconds
 var SHOT_COLOR = 'green';
 var SHOT_RADIUS = 3.5; //in px
 var SHIP_COLOR = 'blue';
+var ROCK_COLOR = 'red';
+var ROCK_RADIUS = 20;
 
 //Html Elements
 var canvas = document.createElement("canvas");
@@ -25,6 +27,51 @@ document.body.appendChild(debug);
 function mmod(m, n) {
   return ((m % n) + n) % n;
 }
+
+//Game Model
+function AsteroidsGame(level) {
+  this.level = level;
+  this.ship = new Ship(WIDTH/2,HEIGHT/2);
+  this.shots = [];
+  this.rocks = [];
+  this.control_state = {}
+}
+
+AsteroidsGame.prototype.update = function(modifier) {
+  //Pass on controls
+  if (this.control_state.thrust) {
+    this.ship.thrust(modifier);
+  }
+  if (this.control_state.left_turn) {
+    this.ship.turn(modifier, 'left');
+  }
+  if (this.control_state.right_turn) {
+    this.ship.turn(modifier, 'right');
+  }
+  if (this.control_state.fire) {
+    if (this.ship.reload <= 0) {
+      this.ship.reload = RELOAD_TIME;
+      var new_shot = new Shot(this.ship.x, this.ship.y, this.ship.dx, this.ship.dy, this.ship.v);
+      this.shots.push(new_shot);
+    }
+  }
+
+
+  //Update shots
+  for (i = 0; i < this.shots.length; i++) {
+    this.shots[i].update(modifier);
+  }
+
+  //Remove dead shots
+  for (i = this.shots.length - 1; i >= 0; i--) {
+    if (this.shots[i].dead()) {
+      this.shots.splice(i, 1);
+    }
+  }
+
+  this.ship.update(modifier);
+}
+
 
 //Ship
 function Ship(x, y) {
@@ -52,33 +99,15 @@ Ship.prototype.turn = function(modifier, direction) {
   }
 }
 
-Ship.prototype.fire = function(modifier) {
-  if (this.reload <= 0) {
-    this.reload = RELOAD_TIME;
-    var new_shot = new Shot(this.x, this.y, this.dx, this.dy, this.v);
-    this.shots.push(new_shot);
-  }
-}
+
 
 Ship.prototype.update = function(modifier) {
   //Drift
   this.x = mmod(this.x + this.dx * modifier, canvas.width);
   this.y = mmod(this.y - this.dy * modifier, canvas.height); //canvas y is reversed
 
-  //Update shots
-  for (i = 0; i < this.shots.length; i++) {
-    this.shots[i].update(modifier);
-  }
-
-  //Remove dead shots
-  for (i = this.shots.length - 1; i >= 0; i--) {
-    if (this.shots[i].dead()) {
-      this.shots.splice(i, 1);
-    }
-  }
-
   //Increment reload
-  this.reload -= modifier;
+  game.ship.reload -= modifier;
 }
 
 
@@ -102,6 +131,20 @@ Shot.prototype.dead = function() {
 }
 
 
+//Rock
+function Rock(x,y,dx,dy) {
+  this.x = x;
+  this.y = y;
+  this.dx = dx;
+  this.dy = dy;
+}
+
+Rock.prototype.update = function(modifier) {
+  this.x = mmod(this.x + this.dx * modifier, canvas.width);
+  this.y = mmod(this.y - this.dy * modifier, canvas.height);
+}
+
+
 
 //Keyboard Controls
 var keysDown = {};
@@ -115,33 +158,27 @@ addEventListener("keyup", function(e) {
 }, false);
 
 function keyboard(modifier) {
+  //clear
+  game.control_state = {};
   //Respond to controls
   if (38 in keysDown) { // Player holding up
-    ship.thrust(modifier);
+    game.control_state.thrust = true;
   }
   if (40 in keysDown) { // Player holding down
 
   }
   if (37 in keysDown) { // Player holding left
-    ship.turn(modifier, 'left');
+    game.control_state.left_turn = true;
   }
   if (39 in keysDown) { // Player holding right
-    ship.turn(modifier, 'right');
+    game.control_state.right_turn = true;
   }
   if (32 in keysDown) { //Player holding space
-    ship.fire(modifier);
+    game.control_state.fire = true;
   }
 
   //Update the ship
-  ship.update(modifier);
-
-  //Output to debug
-  // document.getElementById("debug").innerHTML =
-  //   "X:" + Math.round(ship.x) +
-  //   " Y:" + Math.round(ship.y) +
-  //   " DX:" + Math.round(ship.dx) +
-  //   " DY:" + Math.round(ship.dy) +
-  //   " " + (ship.shots.length);
+  game.update(modifier);
 };
 
 //View Object
@@ -152,6 +189,7 @@ AsteroidsView.prototype.render = function() {
   this.drawBackground();
   this.drawShots();
   this.drawShip();
+  this.drawRocks();
 }
 
 AsteroidsView.prototype.drawBackground = function() {
@@ -161,11 +199,11 @@ AsteroidsView.prototype.drawBackground = function() {
 
 AsteroidsView.prototype.drawShots = function() {
   ctx.fillStyle = SHOT_COLOR;
-  for (i = 0; i < ship.shots.length; i++) {
+  for (i = 0; i < game.shots.length; i++) {
     ctx.beginPath();
     ctx.arc(
-      ship.shots[i].x,
-      ship.shots[i].y,
+      game.shots[i].x,
+      game.shots[i].y,
       SHOT_RADIUS,
       0,
       Math.PI * 2);
@@ -179,8 +217,8 @@ AsteroidsView.prototype.drawShip = function() {
   ctx.fillStyle = SHIP_COLOR;
 
   //Move stroke to ship
-  ctx.translate(ship.x, ship.y);
-  ctx.rotate(-ship.v); //rotate defaults clockwise, where radians are counterclockwise
+  ctx.translate(game.ship.x, game.ship.y);
+  ctx.rotate(-game.ship.v); //rotate defaults clockwise, where radians are counterclockwise
 
   //Draw ship
   ctx.beginPath();
@@ -191,10 +229,23 @@ AsteroidsView.prototype.drawShip = function() {
   ctx.fill();
 
   //Move stroke back
-  ctx.rotate(ship.v);
-  ctx.translate(-ship.x, -ship.y);
+  ctx.rotate(game.ship.v);
+  ctx.translate(-game.ship.x, -game.ship.y);
 }
 
+AsteroidsView.prototype.drawRocks = function() {
+  ctx.fillStyle = ROCK_COLOR;
+  for (i = 0; i < game.rocks.length; i++) {
+    ctx.beginPath();
+    ctx.arc(
+      game.rocks[i].x,
+      game.rocks[i].y,
+      ROCK_RADIUS,
+      0,
+      Math.PI * 2);
+    ctx.fill();
+  }
+}
 
 //Main Game Loop
 function main() {
@@ -215,6 +266,6 @@ requestAnimationFrame = w.requestAnimationFrame || w.webkitRequestAnimationFrame
 
 // Let's play this game!
 var then = Date.now();
-var ship = new Ship(WIDTH/2,HEIGHT/2);
+var game = new AsteroidsGame();
 var view = new AsteroidsView();
 main();
