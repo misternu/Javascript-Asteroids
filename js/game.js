@@ -28,9 +28,12 @@ function mmod(m, n) {
   return ((m % n) + n) % n;
 }
 
+
+
 //Game Model
 function AsteroidsGame(level) {
   this.level = level;
+  this.playing = false;
   this.ship = new Ship(WIDTH/2,HEIGHT/2);
   this.shots = [];
   this.rocks = [];
@@ -56,7 +59,6 @@ AsteroidsGame.prototype.update = function(modifier) {
     }
   }
 
-
   //Update shots
   for (i = 0; i < this.shots.length; i++) {
     this.shots[i].update(modifier);
@@ -69,21 +71,40 @@ AsteroidsGame.prototype.update = function(modifier) {
     }
   }
 
+  //Update the ship
   this.ship.update(modifier);
 }
 
 
-//Ship
-function Ship(x, y) {
+
+//Generic Game Object
+function GameObject(x,y,dx,dy) {
   this.x = x;
   this.y = y;
+  this.dx = dx;
+  this.dy = dy;
+}
+
+GameObject.prototype.drift = function(modifier) {
+  this.x = mmod(this.x + this.dx * modifier, canvas.width);
+  this.y = mmod(this.y - this.dy * modifier, canvas.height); //Canvas y-reversed
+}
+
+GameObject.prototype.update = function(modifier) {
+  this.drift(modifier);
+}
+
+
+
+//Ship
+Ship.prototype = new GameObject()
+Ship.prototype.constructor = Ship;
+function Ship(x, y) {
+  GameObject.call(this, x, y, 0, 0);
   this.v = Math.PI * 0.5;
-  this.dx = 0;
-  this.dy = 0;
   this.rotate = SHIP_ROTATE;
   this.speed = SHIP_THRUST;
   this.reload = 0;
-  this.shots = [];
 }
 
 Ship.prototype.thrust = function(modifier) {
@@ -99,30 +120,27 @@ Ship.prototype.turn = function(modifier, direction) {
   }
 }
 
-
-
 Ship.prototype.update = function(modifier) {
-  //Drift
-  this.x = mmod(this.x + this.dx * modifier, canvas.width);
-  this.y = mmod(this.y - this.dy * modifier, canvas.height); //canvas y is reversed
-
+  GameObject.prototype.update.call(this, modifier);
   //Increment reload
   game.ship.reload -= modifier;
 }
 
 
+
 //Shot
+Shot.prototype = new GameObject()
+Shot.prototype.constructor = Shot;
 function Shot(x,y,dx,dy,v) {
-  this.x = x;
-  this.y = y;
-  this.dx = dx + Math.cos(v) * SHOT_SPEED;
-  this.dy = dy + Math.sin(v) * SHOT_SPEED;
+  GameObject.call(this, x,
+                        y,
+                        dx + Math.cos(v) * SHOT_SPEED,
+                        dy + Math.sin(v) * SHOT_SPEED);
   this.life = SHOT_LIFE;
 }
 
 Shot.prototype.update = function(modifier) {
-  this.x = mmod(this.x + this.dx * modifier, canvas.width);
-  this.y = mmod(this.y - this.dy * modifier, canvas.height);
+  GameObject.prototype.update.call(this, modifier);
   this.life -= modifier;
 }
 
@@ -131,17 +149,16 @@ Shot.prototype.dead = function() {
 }
 
 
+
 //Rock
+Rock.prototype = new GameObject()
+Rock.prototype.constructor = Rock;
 function Rock(x,y,dx,dy) {
-  this.x = x;
-  this.y = y;
-  this.dx = dx;
-  this.dy = dy;
+  GameObject.call(this, x, y, dx, dy);
 }
 
 Rock.prototype.update = function(modifier) {
-  this.x = mmod(this.x + this.dx * modifier, canvas.width);
-  this.y = mmod(this.y - this.dy * modifier, canvas.height);
+  GameObject.prototype.update.call(this, modifier);
 }
 
 
@@ -181,6 +198,8 @@ function keyboard(modifier) {
   game.update(modifier);
 };
 
+
+
 //View Object
 function AsteroidsView() {
 }
@@ -190,6 +209,9 @@ AsteroidsView.prototype.render = function() {
   this.drawShots();
   this.drawShip();
   this.drawRocks();
+  if (game.playing = false) {
+    
+  }
 }
 
 AsteroidsView.prototype.drawBackground = function() {
@@ -246,6 +268,8 @@ AsteroidsView.prototype.drawRocks = function() {
     ctx.fill();
   }
 }
+
+
 
 //Main Game Loop
 function main() {
