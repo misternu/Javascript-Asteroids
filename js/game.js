@@ -6,11 +6,14 @@ var SHIP_ROTATE = Math.PI; //radians per second
 var RELOAD_TIME = 0.16; //in seconds
 var SHOT_SPEED = 350; //px per second
 var SHOT_LIFE = 1; //in seconds
-var SHOT_COLOR = 'green';
+var SHOT_COLOR = 'orange';
 var SHOT_RADIUS = 3.5; //in px
 var SHIP_COLOR = 'blue';
 var ROCK_COLOR = 'red';
-var ROCK_RADIUS = 20;
+var ROCK_RADIUS = 30;
+var MAX_ROCK_SPEED = 90;
+var MIN_ROCK_SPEED = 30;
+var MIN_ROCK_DISTANCE = 150;
 
 //Html Elements
 var canvas = document.createElement("canvas");
@@ -37,13 +40,60 @@ function AsteroidsGame(level) {
   this.ship = new Ship(WIDTH/2,HEIGHT/2);
   this.shots = [];
   this.rocks = [];
-  this.control_state = {}
+  this.control_state = {};
+
+  this.newLevel(this.level);
+}
+
+AsteroidsGame.prototype.newLevel = function(level) {
+  var num_rocks = this.level + 8;
+  for (i = 0; i < num_rocks; i++) {
+    var new_rock = false;
+    while (!new_rock) {
+      var new_x = Math.random() * WIDTH;
+      var new_y = Math.random() * HEIGHT;
+      var new_speed = Math.random() * (MAX_ROCK_SPEED - MIN_ROCK_SPEED) + MIN_ROCK_SPEED;
+      var new_v = Math.random() * Math.PI * 2;
+      var new_dx = Math.cos(new_v) * new_speed;
+      var new_dy = Math.sin(new_v) * new_speed;
+      var try_rock = new Rock(new_x, new_y, new_dx, new_dy);
+      if (this.distance(try_rock, this.ship) > MIN_ROCK_DISTANCE) {
+        new_rock = try_rock;
+      }
+    }
+    this.rocks.push(new_rock);
+    var new_rock = false;
+  }
+}
+
+AsteroidsGame.prototype.distance = function(object1, object2) {
+  var x1 = object1.x;
+  var y1 = object1.y;
+  var x2 = object2.x;
+  var y2 = object2.y;
+  var distance = Math.sqrt(Math.pow(x1-x2,2) + Math.pow(y1-y2,2));
+  return distance;
+}
+
+AsteroidsGame.prototype.collide = function() {
+  var num_rocks = this.rocks.length;
+  var num_shots = this.shots.length;
+  for (var i = num_rocks; i > 0 && this.rocks.length > 0; i--) {
+    for (var j = num_shots; j > 0 && this.shots.length > 0; j--) {
+      if (this.distance(this.shots[j-1], this.rocks[i-1]) < ROCK_RADIUS) {
+        this.rocks.splice(i-1,1);
+        this.shots[j-1].life = 0;
+        break;
+      }
+    }
+  }
 }
 
 AsteroidsGame.prototype.update = function(modifier) {
   //Pass on controls
   if (this.control_state.thrust) {
     this.ship.thrust(modifier);
+    this.playing = true;
   }
   if (this.control_state.left_turn) {
     this.ship.turn(modifier, 'left');
@@ -52,17 +102,24 @@ AsteroidsGame.prototype.update = function(modifier) {
     this.ship.turn(modifier, 'right');
   }
   if (this.control_state.fire) {
-    if (this.ship.reload <= 0) {
+    if (this.ship.reload <= 0 && this.playing) {
       this.ship.reload = RELOAD_TIME;
       var new_shot = new Shot(this.ship.x, this.ship.y, this.ship.dx, this.ship.dy, this.ship.v);
       this.shots.push(new_shot);
     }
   }
 
-  //Update shots
-  for (i = 0; i < this.shots.length; i++) {
-    this.shots[i].update(modifier);
+  //Update shots and rocks
+  if (this.playing) {
+    for (i = 0; i < this.shots.length; i++) {
+      this.shots[i].update(modifier);
+    }
+    for (i = 0; i < this.rocks.length; i++) {
+      this.rocks[i].update(modifier);
+    }
   }
+  //Check for collisions
+  this.collide();
 
   //Remove dead shots
   for (i = this.shots.length - 1; i >= 0; i--) {
@@ -209,8 +266,8 @@ AsteroidsView.prototype.render = function() {
   this.drawShots();
   this.drawShip();
   this.drawRocks();
-  if (game.playing = false) {
-    
+  if (game.playing == false) {
+    this.drawLevel();
   }
 }
 
@@ -239,6 +296,7 @@ AsteroidsView.prototype.drawShip = function() {
   ctx.fillStyle = SHIP_COLOR;
 
   //Move stroke to ship
+  ctx.save()
   ctx.translate(game.ship.x, game.ship.y);
   ctx.rotate(-game.ship.v); //rotate defaults clockwise, where radians are counterclockwise
 
@@ -251,22 +309,47 @@ AsteroidsView.prototype.drawShip = function() {
   ctx.fill();
 
   //Move stroke back
-  ctx.rotate(game.ship.v);
-  ctx.translate(-game.ship.x, -game.ship.y);
+  ctx.restore()
 }
 
 AsteroidsView.prototype.drawRocks = function() {
-  ctx.fillStyle = ROCK_COLOR;
   for (i = 0; i < game.rocks.length; i++) {
-    ctx.beginPath();
-    ctx.arc(
-      game.rocks[i].x,
-      game.rocks[i].y,
-      ROCK_RADIUS,
-      0,
-      Math.PI * 2);
-    ctx.fill();
+    var x = game.rocks[i].x;
+    var y = game.rocks[i].y;
+    this.drawRock(x,y);
+    //Draw looping rocks
+    this.drawRock(x + WIDTH,y);
+    this.drawRock(x + WIDTH,y + HEIGHT);
+    this.drawRock(x + WIDTH,y - HEIGHT);
+    this.drawRock(x - WIDTH,y);
+    this.drawRock(x - WIDTH,y + HEIGHT);
+    this.drawRock(x - WIDTH,y - HEIGHT);
+    this.drawRock(x,y + HEIGHT);
+    this.drawRock(x + WIDTH,y + HEIGHT);
+    this.drawRock(x - WIDTH,y + HEIGHT);
+    this.drawRock(x,y - HEIGHT);
+    this.drawRock(x + WIDTH,y - HEIGHT);
+    this.drawRock(x - WIDTH,y - HEIGHT);
   }
+}
+
+AsteroidsView.prototype.drawRock = function(x,y) {
+  ctx.fillStyle = ROCK_COLOR;
+  ctx.beginPath();
+  ctx.arc(
+    x,
+    y,
+    ROCK_RADIUS,
+    0,
+    Math.PI * 2);
+  ctx.fill();
+}
+
+AsteroidsView.prototype.drawLevel = function() {
+  ctx.textAlign="center";
+  ctx.fillStyle="white";
+  ctx.font="30px Courier"
+  ctx.fillText("Level " + game.level + " - Press \u2191 to start", WIDTH/2, HEIGHT/2)
 }
 
 
@@ -290,6 +373,6 @@ requestAnimationFrame = w.requestAnimationFrame || w.webkitRequestAnimationFrame
 
 // Let's play this game!
 var then = Date.now();
-var game = new AsteroidsGame();
+var game = new AsteroidsGame(1);
 var view = new AsteroidsView();
 main();
