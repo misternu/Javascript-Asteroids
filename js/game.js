@@ -318,17 +318,13 @@ AsteroidsView.prototype.drawRocks = function() {
     var y = game.rocks[i].y;
     this.drawRock(x,y);
     //Draw looping rocks
+    this.drawRock(x,y + HEIGHT);
+    this.drawRock(x,y - HEIGHT);
     this.drawRock(x + WIDTH,y);
     this.drawRock(x + WIDTH,y + HEIGHT);
     this.drawRock(x + WIDTH,y - HEIGHT);
     this.drawRock(x - WIDTH,y);
     this.drawRock(x - WIDTH,y + HEIGHT);
-    this.drawRock(x - WIDTH,y - HEIGHT);
-    this.drawRock(x,y + HEIGHT);
-    this.drawRock(x + WIDTH,y + HEIGHT);
-    this.drawRock(x - WIDTH,y + HEIGHT);
-    this.drawRock(x,y - HEIGHT);
-    this.drawRock(x + WIDTH,y - HEIGHT);
     this.drawRock(x - WIDTH,y - HEIGHT);
   }
 }
